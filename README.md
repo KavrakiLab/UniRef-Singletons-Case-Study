@@ -8,6 +8,8 @@ By examining modern clustering algorithms, we show that the high number ($\sim$6
 
 # Installation
 
-''
+Created from a conda environment.
+```bash
+conda env create -f environment.yml
 
-''
+```
