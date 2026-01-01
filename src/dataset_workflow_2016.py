@@ -10,7 +10,7 @@ import requests
 
 from .consistency_scoring import linclust_protocol_parallel
 from lib.const import CliOPTIONS, benchmark_root_dir
-from funcs import parse_uniref_xmls
+from lib.funcs import parse_uniref_xmls
 from src.workflow import Workflow
 import dask.dataframe as dd
 
