@@ -4,7 +4,7 @@ import tqdm
 from xml.etree import cElementTree
 import pandas as pd
 from pathlib import Path
-from const import benchmark_root_dir
+from .const import benchmark_root_dir
 import pyarrow as pa
 import pyarrow.parquet as pq
 
