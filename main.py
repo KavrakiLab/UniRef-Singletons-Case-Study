@@ -2,8 +2,8 @@ import logging
 
 import typer
 
-from src.Dataset_workflow_2016 import UniProt2016Workflow
-from src.Dataset_workflow_2025 import UniProt2025Workflow
+from src.dataset_workflow_2016 import UniProt2016Workflow
+from src.dataset_workflow_2025 import UniProt2025Workflow
 from lib.const import CliOPTIONS
 
 logging.basicConfig(
