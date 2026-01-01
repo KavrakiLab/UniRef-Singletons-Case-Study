@@ -5,7 +5,7 @@ import requests
 import dask.dataframe as dd
 from builtins import tuple
 
-from consistency_scoring import linclust_protocol_parallel
+from .consistency_scoring import linclust_protocol_parallel
 from lib.const import CliOPTIONS, benchmark_root_dir
 from lib.funcs import parse_grep_output
 from src.workflow import Workflow
