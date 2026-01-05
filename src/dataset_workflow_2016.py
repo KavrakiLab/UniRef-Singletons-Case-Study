@@ -91,8 +91,8 @@ class UniProt2016Workflow(Workflow):
         if not gaf_all.exists():
             gaf_db = self.download_gaf_db()
             gaf_all_db = self.process_gaf_file(gaf_db,individual_components=False)
-            #cd_hit_90_grep_output = grep_xml_members(self.sequence_db_90.as_posix(), self.sequence_db_90.parent.joinpath("90_grepped_xml.txt").as_posix())
-            #cd_hit_50_grep_output = grep_xml_members(self.sequence_db_50.as_posix(), self.sequence_db_50.parent.joinpath("50_grepped_xml.txt").as_posix())
+            cd_hit_90_grep_output = grep_xml_members(self.sequence_db_90.as_posix(), self.sequence_db_90.parent.joinpath("90_grepped_xml.txt").as_posix())
+            cd_hit_50_grep_output = grep_xml_members(self.sequence_db_50.as_posix(), self.sequence_db_50.parent.joinpath("50_grepped_xml.txt").as_posix())
             cdhit_uniref90_df = parse_grep_output(self.sequence_db_90.parent.joinpath("90_grepped_xml.txt"),self.sequence_db_90.parent.joinpath("uniref90_cd_hit.parquet"))
             cdhit_uniref50_df = parse_grep_output(self.sequence_db_50.parent.joinpath("50_grepped_xml.txt"),self.sequence_db_50.parent.joinpath("uniref50_cd_hit.parquet"))
 
