@@ -1,0 +1,14 @@
+name:
+UniRef-Singletons-Case-Study
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - python=3.10
+  - typer
+  - requests
+  - numpy
+  - dask
+  - goatools
+  - tqdm
+  - scikit-learn
