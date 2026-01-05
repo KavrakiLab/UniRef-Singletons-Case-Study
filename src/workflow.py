@@ -370,7 +370,6 @@ class Workflow(abc.ABC):
                 names=["DB_Object_ID", "GO_ID", "Evidence_Code", "With_or_From", "Aspect"],
                 usecols=[1, 4, 6, 7, 8],
                 skiprows=9,
-                compression="gzip",
                 dtype="string[pyarrow]",
                 assume_missing=True,
             )
