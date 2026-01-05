@@ -12,13 +12,10 @@ logging.basicConfig(
 )
 
 
-def main(year_selection: CliOPTIONS, mmseqs2_executable_path, cd_hit_executable_path):
+def main(year_selection: CliOPTIONS, mmseqs2_executable_path, cd_hit_executable_path, gene_ontology_obo_path):
     if year_selection.value == CliOPTIONS.Benchmark2016.value:
-        UniProt2016Workflow(mmseqs2_executable_path, cd_hit_executable_path,
-                            '/home/Users/fmq1/PycharmProjects/UniRefAnalysis/go-basic.obo').run()
+        UniProt2016Workflow(mmseqs2_executable_path, cd_hit_executable_path, gene_ontology_obo_path).run()
     elif year_selection.value == CliOPTIONS.Benchmark2025.value:
-        UniProt2025Workflow(mmseqs2_executable_path, cd_hit_executable_path,
-                            '/home/Users/fmq1/PycharmProjects/UniRefAnalysis/go-basic.obo').run()
-
+        UniProt2025Workflow(mmseqs2_executable_path, cd_hit_executable_path, gene_ontology_obo_path).run()
 
 typer.run(main)
