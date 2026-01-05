@@ -180,12 +180,19 @@ class UniProt2025Workflow(Workflow):
 
     def download_gaf_db(self) -> Path:
         goa_uniprot_all = "http://ftp.ebi.ac.uk/pub/databases/GO/goa/UNIPROT/goa_uniprot_all.gaf.gz"
-        output_path = benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath("goa_file_2025.gz")
-        if not output_path.exists():
-            with requests.get(goa_uniprot_all, stream=True) as r:
-                r.raise_for_status()
-                with open(output_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        if chunk:  # filter out keep-alive chunks
-                            f.write(chunk)
-        return output_path
+        compressed_output_path = benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath("goa_file_2025.gz")
+        decompressed_output_path = benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath("goa_file_2025") 
+        def decompress_gzip(gz_path: Path, out_path: Path):
+            if not out_path.exists():
+                with gzip.open(gz_path, "rb") as f_in, open(out_path, "wb") as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+        if not decompressed_output_path.exists():
+            if not compressed_output_path.exists():
+                with requests.get(goa_uniprot_all, stream=True) as r:
+                    r.raise_for_status()
+                    with open(output_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if chunk:  # filter out keep-alive chunks
+                                f.write(chunk)
+            decompress_gzip(compressed_output_path, decompressed_output_path)
+        return decompressed_output_path
