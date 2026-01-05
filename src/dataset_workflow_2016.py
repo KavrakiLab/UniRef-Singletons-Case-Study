@@ -10,7 +10,7 @@ import requests
 
 from .consistency_scoring import linclust_protocol_parallel
 from lib.const import CliOPTIONS, benchmark_root_dir
-from lib.funcs import parse_uniref_xmls
+from lib.funcs import grep_xml_members,parse_grep_output
 from src.workflow import Workflow
 import dask.dataframe as dd
 
@@ -86,15 +86,20 @@ class UniProt2016Workflow(Workflow):
             logging.debug("Done writing")
         return output_path
 
-    def build_gaf_dbs(self, gaf_all, gaf_bf, gaf_mf, gaf_cc) -> Tuple[Any, Any, Any, Any]:
+    def build_gaf_dbs(self, gaf_all):
         logging.info(f"Building GAF databases for CD-HIT and LINCLUST.")
-        if not gaf_all.exists() or not gaf_bf.exists() or not gaf_mf.exists() or not gaf_cc.exists():
+        if not gaf_all.exists():
             gaf_db = self.download_gaf_db()
-            gaf_dbs = self.process_gaf_file(gaf_db,individual_components=True)
-            cdhit_uniref90_df = parse_uniref_xmls(self.sequence_db_90.as_posix(),
-                                                  self.sequence_db_90.parent.joinpath('uniref90_cd_hit.parquet').as_posix())
-            cdhit_uniref50_df = parse_uniref_xmls(self.sequence_db_50.as_posix(),
-                                                  self.sequence_db_50.parent.joinpath('uniref50_cd_hit.parquet').as_posix())
+            gaf_all_db = self.process_gaf_file(gaf_db,individual_components=False)
+            #cd_hit_90_grep_output = grep_xml_members(self.sequence_db_90.as_posix(), self.sequence_db_90.parent.joinpath("90_grepped_xml.txt").as_posix())
+            #cd_hit_50_grep_output = grep_xml_members(self.sequence_db_50.as_posix(), self.sequence_db_50.parent.joinpath("50_grepped_xml.txt").as_posix())
+            cdhit_uniref90_df = parse_grep_output(self.sequence_db_90.parent.joinpath("90_grepped_xml.txt"),self.sequence_db_90.parent.joinpath("uniref90_cd_hit.parquet"))
+            cdhit_uniref50_df = parse_grep_output(self.sequence_db_50.parent.joinpath("50_grepped_xml.txt"),self.sequence_db_50.parent.joinpath("uniref50_cd_hit.parquet"))
+
+            #cdhit_uniref90_df = parse_uniref_xmls(self.sequence_db_90.as_posix(),
+            #                                      self.sequence_db_90.parent.joinpath('uniref90_cd_hit.parquet').as_posix())
+           # cdhit_uniref50_df = parse_uniref_xmls(self.sequence_db_50.as_posix(),
+           #                                       self.sequence_db_50.parent.joinpath('uniref50_cd_hit.parquet').as_posix())
             cdhit_uniref90_df = self.post_process_cdhit_xml_dataframe(cdhit_uniref90_df)
             cdhit_uniref50_df = self.post_process_cdhit_xml_dataframe(cdhit_uniref50_df)
 
@@ -106,30 +111,33 @@ class UniProt2016Workflow(Workflow):
             linclust_50_results: dd.DataFrame = self.post_process_mmseqs2_clustering(linclust_cluster_50)
 
             logging.info("Merging clustering results into GAF ALL databases.")
-
-            for db in gaf_dbs:
-                db["cdhit_90"] = cdhit_uniref90_df["clusters"]
-                db["cdhit_50"] = cdhit_uniref50_df["clusters"]
-                db["mmseqs_90"] = mmseqs2_90_results["clusters"]
-                db["mmseqs_50"] = mmseqs2_50_results["clusters"]
-                db["linclust_90"] = linclust_90_results["clusters"]
-                db["linclust_50"] = linclust_50_results["clusters"]
-            gaf_dbs[0].to_parquet(gaf_all.as_posix())
-            gaf_dbs[1].to_parquet(gaf_cc.as_posix())
-            gaf_dbs[2].to_parquet(gaf_bf.as_posix())
-            gaf_dbs[3].to_parquet(gaf_mf.as_posix())
-            return gaf_dbs[0], gaf_dbs[1], gaf_dbs[2], gaf_dbs[3]
+            gaf_all_db =gaf_all_db.compute()
+            #cdhit_uniref90_df = cdhit_uniref90_df.compute()
+            #cdhit_uniref50_df = cdhit_uniref50_df.compute()
+                        
+            #for db in gaf_dbs:
+            gaf_all_db["cdhit_90"] = cdhit_uniref90_df["clusters"]
+            gaf_all_db["cdhit_50"] = cdhit_uniref50_df["clusters"]
+            gaf_all_db["mmseqs_90"] = mmseqs2_90_results["clusters"]
+            gaf_all_db["mmseqs_50"] = mmseqs2_50_results["clusters"]
+            gaf_all_db["linclust_90"] = linclust_90_results["clusters"]
+            gaf_all_db["linclust_50"] = linclust_50_results["clusters"]
+            gaf_all_db.to_parquet(gaf_all.as_posix())
+        #    gaf_dbs[1].to_parquet(gaf_cc.as_posix())
+        #    gaf_dbs[2].to_parquet(gaf_bf.as_posix())
+        #    gaf_dbs[3].to_parquet(gaf_mf.as_posix())
+            return gaf_all_db#, gaf_dbs[1], gaf_dbs[2], gaf_dbs[3]
         else:
-            return (dd.read_parquet(gaf_all.as_posix()).compute(), dd.read_parquet(gaf_cc.as_posix()).compute(),
-                    dd.read_parquet(gaf_bf.as_posix()).compute(), dd.read_parquet(gaf_mf.as_posix()).compute())
+            return dd.read_parquet(gaf_all.as_posix()).compute() #dd.read_parquet(gaf_cc.as_posix()).compute(),
+                    #dd.read_parquet(gaf_bf.as_posix()).compute(), #dd.read_parquet(gaf_mf.as_posix()).compute())
 
     def run(self):
-        gaf_all = benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('gaf_2025_with_clustering_data_all')
-        gaf_bf = benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('gaf_2025_with_clustering_data_bf')
-        gaf_mf = benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('gaf_2025_with_clustering_data_mf')
-        gaf_cc = benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('gaf_2025_with_clustering_data_cc')
-        gaf_all_db, gaf_cc_db, gaf_bf_db, gaf_mf_db = self.build_gaf_dbs(gaf_all, gaf_bf, gaf_mf, gaf_cc)
-        gaf_dbs = {"all": gaf_all_db, "cc": gaf_cc_db, "bf": gaf_bf_db, "mf": gaf_mf_db}
+        gaf_all = benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('gaf_2016_with_clustering_data_all')
+        #gaf_bf = benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('gaf_2025_with_clustering_data_bf')
+        #gaf_mf = benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('gaf_2025_with_clustering_data_mf')
+        #gaf_cc = benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('gaf_2025_with_clustering_data_cc')
+        gaf_all_db = self.build_gaf_dbs(gaf_all)# gaf_bf, gaf_mf, gaf_cc)
+        gaf_dbs = {"all": gaf_all_db}
         for db_type, db in gaf_dbs.items():
             logging.info(f"Running for {db_type}")
             cluster_dicts = {'cdhit_90': {},'cdhit_50': {},
@@ -139,13 +147,13 @@ class UniProt2016Workflow(Workflow):
             cluster_results_not_filtered = self.add_go_terms_to_dataframe(db, cluster_dicts, False)
             cluster_results = self.add_go_terms_to_dataframe(db, cluster_dicts, True)
             for cluster_algo in cluster_dicts.keys():
-                datasets.append(cluster_results_not_filtered[cluster_algo], "non_filtered_" + cluster_algo + "_results.csv")
-                datasets.append(cluster_results[cluster_algo], "filtered_" + cluster_algo + "_results.csv")
+                datasets.append((cluster_results_not_filtered[cluster_algo], "non_filtered_" + cluster_algo + "_results.csv"))
+                datasets.append((cluster_results[cluster_algo], "filtered_" + cluster_algo + "_results.csv"))
             for data, filename in datasets:
                 self.process_and_save(data, filename)
 
     def process_and_save(self, data, filename):
-        results = linclust_protocol_parallel(data, self.go_path)
+        results = linclust_protocol_parallel(data, self.go_path, 60)
         results = Workflow.post_process_consistency_data(results)
         output_path = benchmark_root_dir.joinpath(self.benchmark_working_dir, filename)
         results.to_csv(output_path)
