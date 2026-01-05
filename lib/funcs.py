@@ -7,7 +7,55 @@ from pathlib import Path
 from .const import benchmark_root_dir
 import pyarrow as pa
 import pyarrow.parquet as pq
+import os
+from tqdm import tqdm
 
+def grep_xml_members(input_file_path, output_file_path):
+    """
+    Scans an input file for lines containing '<representativeMember>' or '<member>'
+    with a progress bar. Writes matching lines and context to output.
+
+    Args:
+        input_file_path (str): The path to the file to read.
+        output_file_path (str): The path to the file to write.
+    """
+    patterns = ['<representativeMember>', '<member>']
+    context_lines = 2 
+    
+    # Check file existence first to avoid errors after starting progress bar
+    if not os.path.exists(input_file_path):
+        print(f"Error: The file '{input_file_path}' was not found.")
+        return
+
+    # Get total file size in bytes for the progress bar
+    total_size = os.path.getsize(input_file_path)
+
+    try:
+        with open(input_file_path, 'r', encoding='utf-8') as infile, \
+             open(output_file_path, 'w', encoding='utf-8') as outfile, \
+             tqdm(total=total_size, unit='B', unit_scale=True, desc="Processing") as pbar:
+            
+            lines_to_print = 0
+            
+            for line in infile:
+                # Update progress bar by the byte length of the current line
+                # We encode back to utf-8 to get the accurate byte size
+                pbar.update(len(line.encode('utf-8')))
+                
+                # Check match
+                is_match = any(pattern in line for pattern in patterns)
+                
+                if is_match:
+                    lines_to_print = context_lines + 1
+                
+                if lines_to_print > 0:
+                    outfile.write(line)
+                    lines_to_print -= 1
+
+        print(f"\nSuccess: Output written to '{output_file_path}'")
+
+    except Exception as e:
+        print(f"\nAn error occurred: {e}")
 
 def xml_to_fasta(xml_path: str, output_fasta_path: str) -> None:
     logging.info("Processing XML to FASTA")
