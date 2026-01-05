@@ -12,6 +12,7 @@ import numpy as np
 import subprocess
 import tqdm
 from goatools.base import get_godag
+import pyarrow as pa  # <--- Import this
 
 from lib.const import CliOPTIONS, benchmark_working_dir, benchmark_root_dir, EXP_EVIDENCE_CODES
 from lib.funcs import xml_to_fasta, parse_uniref_xmls
@@ -83,12 +84,12 @@ class Workflow(abc.ABC):
             logging.info(f"Running createdb command {build_db}")
             result_build_db = subprocess.run(build_db, capture_output=False, text=True, check=True)
         if not benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('90_mmseqs').joinpath(
-                '90_identity.index').exists():
+                '90_identity_cluster.index').exists():
             run_command_90 = [self._mmseqs2_executable_path, 'cluster',
                               benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath(
                                   'uniref100_db').as_posix(),
                               benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('90_mmseqs').joinpath(
-                                  '90_identity'),
+                                  '90_identity_cluster'),
                               "/home/Users/fmq1/tmp",
                               '--cov-mode', '1', '-c', '0.9', '--min-seq-id', '0.9', '--cluster-mode', '2']
             logging.info(f"Running mmseqs command {run_command_90}")
@@ -102,7 +103,7 @@ class Workflow(abc.ABC):
                                          'uniref100_db').as_posix(),
                                      benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath(
                                          '90_mmseqs').joinpath(
-                                         '90_identity'),
+                                         '90_identity_clsuter'),
                                      benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath(
                                          '90_mmseqs').joinpath(
                                          'clusters.tsv'),
@@ -110,12 +111,12 @@ class Workflow(abc.ABC):
             logging.info(f"Running createtsv command {create_tsv_command_90}")
             create_tsv_command_90 = subprocess.run(create_tsv_command_90, capture_output=False, text=True, check=True)
         if not benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('50_mmseqs').joinpath(
-                '50_identity.index').exists():
+                '50_identity_cluster.index').exists():
             run_command_50 = [self._mmseqs2_executable_path, 'cluster',
                               benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath(
                                   'uniref100_db').as_posix(),
                               benchmark_root_dir.joinpath(self.benchmark_working_dir).joinpath('50_mmseqs').joinpath(
-                                  '50_identity'),
+                                  '50_identity_cluster'),
                               "/home/Users/fmq1/tmp",
                               '--cov-mode', '1', '-c', '0.9', '--min-seq-id', '0.5', '--cluster-mode', '2']
             logging.info(f"Running mmseqs command {run_command_50}")
@@ -247,7 +248,6 @@ class Workflow(abc.ABC):
     def add_go_terms_to_dataframe(protein_database_with_clustering_data: pd.DataFrame,
                                   cluster_dicts: dict, filter_for_singletons: bool):
         logging.info(f"Adding GO terms to dataframe. Filtering for singletons {filter_for_singletons}")
-
         def add_to_dict(cluster_dict, cluster_id, entry_name, go_terms):
             """Helper to append members and GO terms to the cluster dictionary."""
             cluster_dict.setdefault(cluster_id, {"members": [], "go_terms": []})
@@ -266,9 +266,9 @@ class Workflow(abc.ABC):
 
         for index, row in tqdm.tqdm(grouped_exp_go_terms.iterrows()):
             entry_name = index
-            go_terms = ["GO:" + term for term in row["GO_ID"].split("GO:")[1:]]
-            go_terms = np.unique(go_terms).tolist()
-
+          #  go_terms = [term for term in row["GO_terms"]]#.split("GO:")[1:]]
+          #  go_terms = np.unique(go_terms).tolist()
+            go_terms = np.unique(row["GO_terms"]).tolist()
             # Add to all cluster dictionaries
             for method in cluster_dicts:
                 add_to_dict(cluster_dicts[method], row[method], entry_name, go_terms)
@@ -288,13 +288,15 @@ class Workflow(abc.ABC):
         if mmseqs2_clustering_output_path.with_suffix('.parquet').exists():
             logging.info(f"Parquet exists {mmseqs2_clustering_output_path.with_suffix('.parquet').as_posix()}"
                          f", so skipping the post processing.")
-            clusters = dd.read_parquet(mmseqs2_clustering_output_path.with_suffix('.parquet').as_posix())
+            clusters = pd.read_parquet(mmseqs2_clustering_output_path.with_suffix('.parquet').as_posix())
         else:
-            clusters = dd.read_csv(mmseqs2_clustering_output_path, header=None, sep="\t")
-            clusters = clusters.set_index(1)
-            clusters = clusters.rename(columns={0: "clusters"})
+            clusters = pd.read_csv(mmseqs2_clustering_output_path, header=None, sep="\t")
+            #clusters = clusters.set_index(1)
+            clusters = clusters.rename(columns={0: "clusters",1:"rep"})
+            clusters = clusters.set_index("rep")
             clusters.index = clusters.index.str.removeprefix("UniRef90_")
             clusters.index = clusters.index.str.removeprefix("UniRef100_")
+            #clusters =clusters.reset_index().dropna(subset=[1]).set_index(1)
             clusters = clusters[~clusters.index.duplicated(keep="first")]
             clusters.to_parquet(mmseqs2_clustering_output_path.with_suffix('.parquet'))
         return clusters
@@ -332,29 +334,13 @@ class Workflow(abc.ABC):
         data["length"] = data["consistency"].apply(lambda x: len(x))
         return data
 
+#import dask.dataframe as dd
+
     def process_gaf_file(self, gaf_file: Path, individual_components: bool = False):
         """
-        Process a GAF (Gene Annotation File) efficiently using Dask on a high-performance machine.
-
-        This function:
-        - Reads and filters GAF data using Dask.
-        - Groups GO terms per protein (DB_Object_ID) across all aspects (C, F, P).
-        - Optionally processes and saves per-aspect (CC, MF, BP) groupings.
-        - Writes results to Parquet and returns a lazy Dask DataFrame.
-
-        Parameters
-        ----------
-        gaf_file : Path
-        Path to gzipped GAF/TSV file.
-        individual_components : bool, default=False
-            If True, also writes and returns per-aspect (C, F, P) Parquets.
-
-        Returns
-        -------
-        dd.DataFrame
-            Aggregated GO terms per DB_Object_ID (and optionally per aspect if saved).
+        Process a GAF file.
+        Includes explicit Schema to handle List<String> columns and Index writing.
         """
-        # --- Setup paths ---
         workdir = Path(benchmark_root_dir) / self.benchmark_working_dir
         workdir.mkdir(parents=True, exist_ok=True)
 
@@ -363,10 +349,16 @@ class Workflow(abc.ABC):
         p_bf = workdir / "gaf_file_bf.parquet"
         p_mf = workdir / "gaf_file_mf.parquet"
 
-        # Determine rebuild condition
+        # --- Define Explicit Schema ---
+        # This solves the "Expected bytes, got list" and "int64 vs string" errors.
+        output_schema = pa.schema([
+            ("DB_Object_ID", pa.string()),       # Index is a string
+            ("GO_terms", pa.list_(pa.string()))  # Column is a List of strings
+        ])
+
         rebuild = (
-                not p_all.exists() or
-                (individual_components and not all(p.exists() for p in [p_cc, p_bf, p_mf]))
+            not p_all.exists() or
+            (individual_components and not all(p.exists() for p in [p_cc, p_bf, p_mf]))
         )
 
         if rebuild:
@@ -381,39 +373,51 @@ class Workflow(abc.ABC):
                 compression="gzip",
                 dtype="string[pyarrow]",
                 assume_missing=True,
-
             )
 
-            # Keep relevant columns
             df = df[["DB_Object_ID", "GO_ID", "Evidence_Code", "Aspect"]]
-
-            # Optimize memory usage
             df["Aspect"] = df["Aspect"].astype("category")
             df["Evidence_Code"] = df["Evidence_Code"].astype("category")
-
-            # Filter by evidence codes
             df = df[df["Evidence_Code"].isin(EXP_EVIDENCE_CODES)][["DB_Object_ID", "GO_ID", "Aspect"]]
 
-            # Partition by DB_Object_ID for efficient groupby
-
-            df = df.set_index("DB_Object_ID", shuffle="tasks")
-            df["accension"] = df.index
-            # --- Aggregation helper ---
+        # --- Aggregation helper ---
             def aggregate_terms(dataframe: dd.DataFrame) -> dd.DataFrame:
-                return dataframe.groupby(dataframe.index)["GO_ID"].apply(lambda s: list(set(s)), meta=("GO_terms", "object")).to_frame(name="GO_terms")
+                # 1. Group and aggregate into lists
+                grouped = dataframe.groupby("DB_Object_ID")["GO_ID"].apply(
+                    lambda s: list(set(s)),
+                    meta=("GO_terms", "object")
+                )
 
-            # Aggregate all GO terms
+            # 2. Convert to DataFrame
+                df_out = grouped.to_frame(name="GO_terms")
+
+            # 3. Explicitly name the index to ensure 'DB_Object_ID' is recognized
+                df_out = df_out.map_partitions(lambda pdf: pdf.rename_axis("DB_Object_ID"))
+
+                return df_out
+
+        # Aggregate all GO terms
             grouped_all = aggregate_terms(df)
 
-            grouped_all.to_parquet(p_all, write_index=True, engine="pyarrow")
+            # Write using the EXPLICIT SCHEMA
+            grouped_all.to_parquet(
+                p_all,
+                write_index=True,
+                engine="pyarrow",
+                schema=output_schema  # <--- Helper prevents type errors
+            )
 
-            # Aggregate by aspect if requested
             if individual_components:
                 for aspect, path in zip(["C", "P", "F"], [p_cc, p_bf, p_mf]):
                     agg = aggregate_terms(df[df["Aspect"] == aspect])
-                    agg.to_parquet(path, write_index=True, engine="pyarrow")
+                    agg.to_parquet(
+                        path,
+                        write_index=True,
+                        engine="pyarrow",
+                        schema=output_schema # <--- Use here as well
+                    )
 
-        # --- Load outputs lazily ---
+    # --- Load outputs lazily ---
         out_all = dd.read_parquet(p_all.as_posix(), engine="pyarrow")
 
         if individual_components:
