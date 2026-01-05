@@ -14,7 +14,7 @@ External protein clustering tools are needed to replicate benchmarking results. 
 Created from a conda environment.
 ```bash
 conda env create -f environment.yml
-
+conda activate UniRef-Singletons-Case-Study
 ```
 
 Running Code:
