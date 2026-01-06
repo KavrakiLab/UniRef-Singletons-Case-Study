@@ -1,6 +1,5 @@
 import logging
 import xml.etree.ElementTree as ET
-import tqdm
 from xml.etree import cElementTree
 import pandas as pd
 from pathlib import Path
@@ -100,7 +99,7 @@ def parse_grep_output(grep_file, parquet_file_output):
     if parquet_file_output.exists():
         return parquet_file_output
     with open(grep_file, 'r') as grep_output:
-        for line in tqdm.tqdm(grep_output):
+        for line in tqdm(grep_output):
             if line == "<representativeMember>\n":
                 db_reference = next(grep_output)
                 rep_info = parse_entry_string(next(grep_output))
@@ -158,7 +157,7 @@ def parse_uniref_xmls(xml_path: str, parquet_path: str, chunk_size: int = 500_00
     writer = None
     last_seen = None
 
-    for _, elem in tqdm.tqdm(context, desc="Parsing UniRef XML"):
+    for _, elem in tqdm(context, desc="Parsing UniRef XML"):
         if elem.tag == "{http://uniprot.org/uniref}entry":
             rep = elem.attrib["id"]
             last_seen = rep
@@ -447,7 +446,7 @@ def parse_dat_file_for_fasta(dat_file_path, fasta_file_output):
 
     read_seq = False
     fasta = []
-    for line in tqdm.tqdm(dat_file):
+    for line in tqdm(dat_file):
         if line.startswith("AC"):
             entry = line.split()[-1][:-1]
         elif line.startswith("SQ"):
