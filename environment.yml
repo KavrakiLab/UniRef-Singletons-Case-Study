@@ -1,5 +1,4 @@
-name:
-UniRef-Singletons-Case-Study
+name: UniRef-Singletons-Case-Study
 channels:
   - bioconda
   - conda-forge
