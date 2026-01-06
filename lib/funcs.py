@@ -64,7 +64,7 @@ def xml_to_fasta(xml_path: str, output_fasta_path: str) -> None:
     if Path(output_fasta_path).exists():
         return None
     with open(output_fasta_path, 'w') as out:
-        for event, elem in tqdm.tqdm(cElementTree.iterparse(xml_path, events=('end',))):
+        for event, elem in tqdm(cElementTree.iterparse(xml_path, events=('end',))):
             # Adjust the parent element as needed based on your XML structure
             if elem.tag == '{http://uniprot.org/uniref}representativeMember':
                 accession = elem[0][0].attrib["value"]
